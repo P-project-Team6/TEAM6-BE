@@ -148,3 +148,79 @@ CREATE TABLE IF NOT EXISTS stock_daily_recommendations (
     INDEX idx_rec_source_date (source_id, signal_date),
     INDEX idx_rec_date (signal_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS post_ai_analysis (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    post_id BIGINT UNSIGNED NOT NULL COMMENT 'FK → external_posts.id',
+
+    model_version VARCHAR(50) NOT NULL DEFAULT 'v1',
+    is_spam TINYINT NOT NULL COMMENT '스팸/어그로성 게시글 여부',
+    sentiment_label VARCHAR(20) NULL COMMENT 'positive / neutral / negative',
+    sentiment_score FLOAT NULL COMMENT '감성 점수',
+    analyzed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_post_ai_post
+        FOREIGN KEY (post_id) REFERENCES external_posts(id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_post_model
+        UNIQUE (post_id, model_version),
+
+    INDEX idx_post_ai_spam (is_spam),
+    INDEX idx_post_ai_sentiment (sentiment_label)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS stock_fake_pump_predictions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    stock_id BIGINT UNSIGNED NOT NULL COMMENT 'FK → stocks.id',
+    source_id BIGINT UNSIGNED NOT NULL COMMENT 'FK → sources.id',
+
+    signal_date DATE NOT NULL COMMENT '분석 기준 날짜',
+    positive_ratio FLOAT NOT NULL COMMENT '긍정 비율',
+    close_price DECIMAL(15,2) NULL COMMENT '해당일 종가',
+    prev_close_price DECIMAL(15,2) NULL COMMENT '전일 종가',
+    volume BIGINT UNSIGNED NULL COMMENT '거래량',
+    volume_5d_ma FLOAT NULL COMMENT '5일 평균 거래량',
+    is_fake_pump TINYINT NOT NULL COMMENT '가짜 정보/과열 가능성 여부',
+    prediction_success TINYINT NULL COMMENT '예측 성공 여부',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+               ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_fake_stock
+        FOREIGN KEY (stock_id) REFERENCES stocks(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_fake_source
+        FOREIGN KEY (source_id) REFERENCES sources(id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_fake_stock_source_date
+        UNIQUE (stock_id, source_id, signal_date),
+
+    INDEX idx_fake_date (signal_date),
+    INDEX idx_fake_stock_date (stock_id, signal_date),
+    INDEX idx_fake_flag (is_fake_pump)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS ai_accuracy_summary (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  
+    stock_id BIGINT UNSIGNED NOT NULL COMMENT 'FK → stocks.id',
+  
+    model_name VARCHAR(50) NOT NULL DEFAULT 'fake_pump_filter',
+    total_rec INT UNSIGNED NOT NULL COMMENT '전체 예측 수',
+    success_count INT UNSIGNED NOT NULL COMMENT '성공 예측 수',
+    accuracy_pct FLOAT NOT NULL COMMENT '정확도(%)',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+               ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_ai_acc_stock
+        FOREIGN KEY (stock_id) REFERENCES stocks(id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_ai_acc_stock_model
+        UNIQUE (stock_id, model_name),
+    INDEX idx_ai_acc_accuracy (accuracy_pct)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
